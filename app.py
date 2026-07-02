@@ -358,7 +358,7 @@ if st.session_state.view == "home":
             <div style='display:flex; flex-wrap:wrap; align-items:center; gap:24px;'>
                 <div style='flex:1.2; min-width:300px;'>
                     <div style='font-size:12px; font-weight:700; color:#2563eb; letter-spacing:1px;'>10 HEURÍSTICAS · NIELSEN</div>
-                    <h1 style='font-size:48px; margin: 12px 0; color:#0f172a;'><span style='font-style:italic; color:#2563eb;'>NEXUS ANALYZER SCORE</span></h1>
+                    <h1 style='font-size:48px; margin: 12px 0; color:#0f172a;'><span style='font-style:normal; color:#2563eb;'>NEXUS ANALYZER SCORE</span></h1>
                     <p style='font-size:16px; color:#475569; line-height:1.6;'>Um instrumento de avaliação heurística baseado nas 10 heurísticas de Jakob Nielsen, com pontuação ponderada de critérios.</p>
                 </div>
                 <div style='flex:1; min-width:280px;'>
