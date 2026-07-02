@@ -553,9 +553,18 @@ elif st.session_state.view == "assessment":
 
     st.caption(f"Avaliando item {st.session_state.current + 1} de {len(HEURISTICS)}")
     st.markdown(f"<h3 style='color:#0f172a; margin-top:0;'>{current_heuristic['fullName']}</h3>", unsafe_allow_html=True)
-    st.write(current_heuristic["description"])
+    st.markdown(
+        f"<p style='color:#1e293b; font-size:15px; line-height:1.6;'>{current_heuristic['description']}</p>",
+        unsafe_allow_html=True,
+    )
 
-    st.markdown(f"👉 **{current_heuristic['question']}**")
+    st.markdown(
+        f"<div style='background:#eef2ff; border:1px solid #c7d2fe; border-left:4px solid #2563eb; "
+        f"border-radius:8px; padding:14px 16px; margin:10px 0 16px 0;'>"
+        f"<span style='color:#0f172a; font-size:16px; font-weight:700;'>👉 {current_heuristic['question']}</span>"
+        f"</div>",
+        unsafe_allow_html=True,
+    )
 
     # Renderização de botões de opção de resposta
     current_saved_value = st.session_state.answers.get(current_heuristic["id"], None)
