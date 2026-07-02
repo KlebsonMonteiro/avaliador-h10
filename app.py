@@ -1,6 +1,20 @@
 import streamlit as st
 import plotly.graph_objects as go
 from datetime import datetime
+from io import BytesIO
+
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.units import cm
+from reportlab.lib import colors
+from reportlab.platypus import (
+    SimpleDocTemplate,
+    Paragraph,
+    Spacer,
+    Table,
+    TableStyle,
+    HRFlowable,
+)
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 
 # Configuração da página
 st.set_page_config(
@@ -294,6 +308,145 @@ def get_report_text(url, answers, total, by_heuristic):
         ]
     )
     return "\n".join(lines)
+
+
+def generate_pdf_report(url, answers, total, by_heuristic):
+    """Gera o relatório de avaliação heurística em formato PDF e retorna os bytes do arquivo."""
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        topMargin=2 * cm,
+        bottomMargin=2 * cm,
+        leftMargin=2 * cm,
+        rightMargin=2 * cm,
+        title="Relatório de Avaliação Heurística H10",
+    )
+
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle(
+        "TitleCustom",
+        parent=styles["Title"],
+        fontSize=20,
+        textColor=colors.HexColor("#0f172a"),
+        spaceAfter=4,
+    )
+    subtitle_style = ParagraphStyle(
+        "SubtitleCustom",
+        parent=styles["Normal"],
+        fontSize=11,
+        textColor=colors.HexColor("#2563eb"),
+        spaceAfter=14,
+    )
+    body_style = ParagraphStyle(
+        "BodyCustom",
+        parent=styles["Normal"],
+        fontSize=10,
+        textColor=colors.HexColor("#334155"),
+        leading=15,
+    )
+    heading_style = ParagraphStyle(
+        "HeadingCustom",
+        parent=styles["Heading2"],
+        fontSize=13,
+        textColor=colors.HexColor("#0f172a"),
+        spaceBefore=12,
+        spaceAfter=8,
+    )
+    sub_heading_style = ParagraphStyle(
+        "SubHeadingCustom",
+        parent=styles["Heading3"],
+        fontSize=11,
+        textColor=colors.HexColor("#0f172a"),
+        spaceBefore=10,
+        spaceAfter=6,
+    )
+
+    cls = get_classification(total)
+    elements = []
+
+    elements.append(Paragraph("Relatório de Avaliação Heurística", title_style))
+    elements.append(Paragraph("Baseado nas 10 Heurísticas de Nielsen", subtitle_style))
+
+    elements.append(Paragraph(f"<b>Site avaliado:</b> {url}", body_style))
+    elements.append(Paragraph(f"<b>Data:</b> {datetime.now().strftime('%d/%m/%Y')}", body_style))
+    elements.append(
+        Paragraph(
+            f"<b>Pontuação geral:</b> {total}/100 — "
+            f"<font color='{cls['color']}'><b>{cls['label']}</b></font>",
+            body_style,
+        )
+    )
+    elements.append(Paragraph(cls["description"], body_style))
+
+    elements.append(Spacer(1, 0.4 * cm))
+    elements.append(HRFlowable(width="100%", color=colors.HexColor("#cbd5e1"), thickness=1))
+
+    elements.append(Paragraph("Análise por Heurística", heading_style))
+
+    table_data = [["ID", "Heurística", "Pontuação", "Resposta", "Peso"]]
+    for h in HEURISTICS:
+        score = by_heuristic[h["id"]]
+        value = answers.get(h["id"], 0)
+        label = get_answer_label(value)
+        table_data.append(
+            [
+                f"H{h['id']:02d}",
+                h["fullName"],
+                f"{score}%",
+                f"{label} ({value}/4)",
+                f"×{h['weight']}",
+            ]
+        )
+
+    table = Table(table_data, colWidths=[1.6 * cm, 6.3 * cm, 2.2 * cm, 4.6 * cm, 1.8 * cm], repeatRows=1)
+    table.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#0f172a")),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                ("FONTSIZE", (0, 0), (-1, -1), 8.5),
+                ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#e2e8f0")),
+                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f8fafc")]),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("TOPPADDING", (0, 0), (-1, -1), 6),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+                ("LEFTPADDING", (0, 0), (-1, -1), 6),
+            ]
+        )
+    )
+    elements.append(table)
+    elements.append(Spacer(1, 0.5 * cm))
+
+    strengths = sorted(HEURISTICS, key=lambda h: by_heuristic[h["id"]], reverse=True)[:3]
+    priorities = sorted(HEURISTICS, key=lambda h: by_heuristic[h["id"]])[:3]
+
+    elements.append(Paragraph("Pontos Fortes", sub_heading_style))
+    for h in strengths:
+        elements.append(
+            Paragraph(f"✓ {h['fullName']} — {by_heuristic[h['id']]}%", body_style)
+        )
+
+    elements.append(Paragraph("Áreas Prioritárias", sub_heading_style))
+    for h in priorities:
+        elements.append(
+            Paragraph(f"! {h['fullName']} — {by_heuristic[h['id']]}%", body_style)
+        )
+
+    elements.append(Spacer(1, 1 * cm))
+    elements.append(HRFlowable(width="100%", color=colors.HexColor("#cbd5e1"), thickness=1))
+    elements.append(Spacer(1, 0.2 * cm))
+    elements.append(
+        Paragraph(
+            "Gerado por Avaliador Heurístico H10",
+            ParagraphStyle("Footer", parent=styles["Normal"], fontSize=9, textColor=colors.HexColor("#94a3b8")),
+        )
+    )
+
+    doc.build(elements)
+    buffer.seek(0)
+    return buffer.getvalue()
 
 
 def reset_state():
@@ -596,16 +749,27 @@ elif st.session_state.view == "results":
         st.caption(f"Status avaliado: **{label}** · (Peso Multiplicador: ×{h['weight']}) · Grau de Conformidade: {score}%")
         st.markdown("<br>", unsafe_allow_html=True)
 
-    # Geração e exportação do relatório TXT
-    report = get_report_text(st.session_state.url, st.session_state.answers, total, by_heuristic)
-    
-    st.download_button(
-        label="📥 Baixar Relatório Técnico (.TXT)",
-        data=report,
-        file_name=f"relatorio_heuristico_h10_{datetime.now().strftime('%Y-%m-%d')}.txt",
-        mime="text/plain",
-        use_container_width=True
-    )
+    # Geração e exportação dos relatórios (TXT e PDF)
+    report_txt = get_report_text(st.session_state.url, st.session_state.answers, total, by_heuristic)
+    report_pdf = generate_pdf_report(st.session_state.url, st.session_state.answers, total, by_heuristic)
+
+    col_pdf, col_txt = st.columns(2)
+    with col_pdf:
+        st.download_button(
+            label="📄 Baixar Relatório em PDF",
+            data=report_pdf,
+            file_name=f"relatorio_heuristico_h10_{datetime.now().strftime('%Y-%m-%d')}.pdf",
+            mime="application/pdf",
+            use_container_width=True,
+        )
+    with col_txt:
+        st.download_button(
+            label="📥 Baixar Relatório Técnico (.TXT)",
+            data=report_txt,
+            file_name=f"relatorio_heuristico_h10_{datetime.now().strftime('%Y-%m-%d')}.txt",
+            mime="text/plain",
+            use_container_width=True,
+        )
 
     st.markdown("<br>", unsafe_allow_html=True)
     if st.button("Iniciar Nova Avaliação Completa", type="tertiary", use_container_width=True):
