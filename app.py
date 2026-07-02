@@ -243,73 +243,6 @@ def normalize_url(raw_url):
     return text
 
 
-def get_report_text(url, answers, total, by_heuristic):
-    strengths = sorted(
-        HEURISTICS,
-        key=lambda h: by_heuristic[h["id"]],
-        reverse=True,
-    )[:3]
-    priorities = sorted(
-        HEURISTICS,
-        key=lambda h: by_heuristic[h["id"]],
-    )[:3]
-    cls = get_classification(total)
-
-    lines = [
-        "RELATÓRIO DE AVALIAÇÃO HEURÍSTICA",
-        "Baseado nas 10 Heurísticas de Nielsen",
-        "=" * 50,
-        "",
-        f"Site avaliado: {url}",
-        f"Data: {datetime.now().strftime('%d/%m/%Y')}",
-        f"Pontuação geral: {total}/100 — {cls['label']}",
-        cls["description"],
-        "",
-        "-" * 50,
-        "ANÁLISE POR HEURÍSTICA",
-        "-" * 50,
-        "",
-    ]
-
-    for h in HEURISTICS:
-        score = by_heuristic[h["id"]]
-        value = answers.get(h["id"], 0)
-        label = get_answer_label(value)
-
-        lines.append(f"H{str(h['id']).zfill(2)} · {h['fullName']}")
-        lines.append(
-            f"     Pontuação: {score}% | Resposta: {label} ({value}/4) | Peso: ×{h['weight']}"
-        )
-        lines.append("")
-
-    lines.extend(
-        [
-            "-" * 50,
-            "PONTOS FORTES",
-        ]
-    )
-    for h in strengths:
-        lines.append(f"  ✓ {h['fullName']} — {by_heuristic[h['id']]}%")
-
-    lines.extend(
-        [
-            "",
-            "ÁREAS PRIORITÁRIAS",
-        ]
-    )
-    for h in priorities:
-        lines.append(f"  ! {h['fullName']} — {by_heuristic[h['id']]}%")
-
-    lines.extend(
-        [
-            "",
-            "-" * 50,
-            "Gerado por Avaliador Heurístico H10",
-        ]
-    )
-    return "\n".join(lines)
-
-
 def generate_pdf_report(url, answers, total, by_heuristic):
     """Gera o relatório de avaliação heurística em formato PDF e retorna os bytes do arquivo."""
     buffer = BytesIO()
@@ -749,27 +682,16 @@ elif st.session_state.view == "results":
         st.caption(f"Status avaliado: **{label}** · (Peso Multiplicador: ×{h['weight']}) · Grau de Conformidade: {score}%")
         st.markdown("<br>", unsafe_allow_html=True)
 
-    # Geração e exportação dos relatórios (TXT e PDF)
-    report_txt = get_report_text(st.session_state.url, st.session_state.answers, total, by_heuristic)
+    # Geração e exportação do relatório em PDF
     report_pdf = generate_pdf_report(st.session_state.url, st.session_state.answers, total, by_heuristic)
 
-    col_pdf, col_txt = st.columns(2)
-    with col_pdf:
-        st.download_button(
-            label="📄 Baixar Relatório em PDF",
-            data=report_pdf,
-            file_name=f"relatorio_heuristico_h10_{datetime.now().strftime('%Y-%m-%d')}.pdf",
-            mime="application/pdf",
-            use_container_width=True,
-        )
-    with col_txt:
-        st.download_button(
-            label="📥 Baixar Relatório Técnico (.TXT)",
-            data=report_txt,
-            file_name=f"relatorio_heuristico_h10_{datetime.now().strftime('%Y-%m-%d')}.txt",
-            mime="text/plain",
-            use_container_width=True,
-        )
+    st.download_button(
+        label="📄 Baixar Relatório em PDF",
+        data=report_pdf,
+        file_name=f"relatorio_heuristico_h10_{datetime.now().strftime('%Y-%m-%d')}.pdf",
+        mime="application/pdf",
+        use_container_width=True,
+    )
 
     st.markdown("<br>", unsafe_allow_html=True)
     if st.button("Iniciar Nova Avaliação Completa", type="tertiary", use_container_width=True):
