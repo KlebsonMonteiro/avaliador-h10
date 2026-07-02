@@ -1,6 +1,7 @@
 import streamlit as st
 import plotly.graph_objects as go
 from datetime import datetime
+from fpdf import FPDF  # Certifique-se de adicionar 'fpdf2' no seu files requirements.txt
 
 # Configuração da página
 st.set_page_config(
@@ -183,6 +184,7 @@ def get_classification(score):
         return {
             "label": "Excelente",
             "color": "#059669",
+            "rgb": (5, 150, 105),
             "bg": "#ECFDF5",
             "border": "#A7F3D0",
             "description": "Interface exemplar com altíssima usabilidade.",
@@ -191,6 +193,7 @@ def get_classification(score):
         return {
             "label": "Bom",
             "color": "#2563EB",
+            "rgb": (37, 99, 235),
             "bg": "#EFF6FF",
             "border": "#BFDBFE",
             "description": "Boa usabilidade com oportunidades pontuais de melhoria.",
@@ -199,6 +202,7 @@ def get_classification(score):
         return {
             "label": "Regular",
             "color": "#D97706",
+            "rgb": (217, 119, 6),
             "bg": "#FFFBEB",
             "border": "#FDE68A",
             "description": "Usabilidade aceitável, mas com problemas que merecem atenção.",
@@ -207,6 +211,7 @@ def get_classification(score):
         return {
             "label": "Deficiente",
             "color": "#EA580C",
+            "rgb": (234, 88, 12),
             "bg": "#FFF7ED",
             "border": "#FED7AA",
             "description": "Problemas relevantes afetam a experiência do usuário.",
@@ -214,6 +219,7 @@ def get_classification(score):
     return {
         "label": "Crítico",
         "color": "#DC2626",
+        "rgb": (220, 38, 38),
         "bg": "#FEF2F2",
         "border": "#FECACA",
         "description": "Problemas graves de usabilidade comprometendo o sistema.",
@@ -229,385 +235,108 @@ def normalize_url(raw_url):
     return text
 
 
-def get_report_text(url, answers, total, by_heuristic):
-    strengths = sorted(
-        HEURISTICS,
-        key=lambda h: by_heuristic[h["id"]],
-        reverse=True,
-    )[:3]
-    priorities = sorted(
-        HEURISTICS,
-        key=lambda h: by_heuristic[h["id"]],
-    )[:3]
+class PDFReport(FPDF):
+    def header(self):
+        self.set_font("Arial", "B", 10)
+        self.set_text_color(100, 116, 139)
+        self.cell(0, 10, "NEXUS ANALYZER SCORE — RELATÓRIO TÉCNICO", 0, 1, "L")
+        self.line(10, 18, 200, 18)
+        self.ln(5)
+
+    def footer(self):
+        self.set_y(-15)
+        self.set_font("Arial", "I", 8)
+        self.set_text_color(148, 163, 184)
+        self.cell(0, 10, f"Página {self.page_no()}", 0, 0, "C")
+
+
+def generate_pdf_report(url, answers, total, by_heuristic):
+    pdf = PDFReport()
+    pdf.add_page()
+    pdf.set_auto_page_break(auto=True, margin=15)
+    
     cls = get_classification(total)
-
-    lines = [
-        "RELATÓRIO DE AVALIAÇÃO HEURÍSTICA",
-        "Baseado nas 10 Heurísticas de Nielsen",
-        "=" * 50,
-        "",
-        f"Site avaliado: {url}",
-        f"Data: {datetime.now().strftime('%d/%m/%Y')}",
-        f"Pontuação geral: {total}/100 — {cls['label']}",
-        cls["description"],
-        "",
-        "-" * 50,
-        "ANÁLISE POR HEURÍSTICA",
-        "-" * 50,
-        "",
-    ]
-
-    for h in HEURISTICS:
-        score = by_heuristic[h["id"]]
-        value = answers.get(h["id"], 0)
-        label = get_answer_label(value)
-
-        lines.append(f"H{str(h['id']).zfill(2)} · {h['fullName']}")
-        lines.append(
-            f"     Pontuação: {score}% | Resposta: {label} ({value}/4) | Peso: ×{h['weight']}"
-        )
-        lines.append("")
-
-    lines.extend(
-        [
-            "-" * 50,
-            "PONTOS FORTES",
-        ]
-    )
-    for h in strengths:
-        lines.append(f"  ✓ {h['fullName']} — {by_heuristic[h['id']]}%")
-
-    lines.extend(
-        [
-            "",
-            "ÁREAS PRIORITÁRIAS",
-        ]
-    )
-    for h in priorities:
-        lines.append(f"  ! {h['fullName']} — {by_heuristic[h['id']]}%")
-
-    lines.extend(
-        [
-            "",
-            "-" * 50,
-            "Gerado por Avaliador Heurístico H10",
-        ]
-    )
-    return "\n".join(lines)
-
-
-def reset_state():
-    st.session_state.view = "home"
-    st.session_state.url = ""
-    st.session_state.current = 0
-    st.session_state.answers = {}
-
-
-if "view" not in st.session_state:
-    st.session_state.view = "home"
-if "url" not in st.session_state:
-    st.session_state.url = ""
-if "current" not in st.session_state:
-    st.session_state.current = 0
-if "answers" not in st.session_state:
-    st.session_state.answers = {}
-
-
-# ─── HOME PAGE ───────────────────────────────────────────────────────────────
-if st.session_state.view == "home":
-    st.markdown(
-        """
-        <style>
-        .block-container { padding-top: 0; }
-        .hero-box {
-            background: linear-gradient(90deg, #eef4ff 0%, #f8fafc 50%, #eefbf6 100%);
-            border: 1px solid #dbe7ff;
-            border-radius: 18px;
-            padding: 36px;
-            box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
-        }
-        .card-mini {
-            background: #ffffff;
-            border: 1px solid #e2e8f0;
-            border-radius: 14px;
-            padding: 18px;
-            text-align: center;
-            box-shadow: inset 0 -1px 0 rgba(15, 23, 42, 0.04);
-        }
-        .heuristic-card {
-            background: linear-gradient(90deg, #ffffff 0%, #f8fafc 100%);
-            border: 1px solid #e2e8f0;
-            border-radius: 12px;
-            padding: 16px;
-            margin-bottom: 10px;
-        }
-        .info-panel {
-            background: #f8fafc;
-            border: 1px solid #e2e8f0;
-            border-radius: 12px;
-            padding: 16px;
-        }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    st.markdown(
-        """
-        <div class="hero-box">
-            <div style='display:flex; flex-wrap:wrap; align-items:center; gap:24px;'>
-                <div style='flex:1.2; min-width:300px;'>
-                    <div style='font-size:12px; font-weight:700; color:#2563eb; letter-spacing:1px;'>10 HEURÍSTICAS · NIELSEN</div>
-                    <h1 style='font-size:48px; margin: 12px 0; color:#0f172a;'><span style='font-style:italic; color:#2563eb;'>NEXUS ANALYZER SCORE</span></h1>
-                    <p style='font-size:16px; color:#475569; line-height:1.6;'>Um instrumento de avaliação heurística baseado nas 10 heurísticas de Jakob Nielsen, com pontuação ponderada de critérios.</p>
-                </div>
-                <div style='flex:1; min-width:280px;'>
-                    <div style='display:grid; grid-template-columns:1fr 1fr; gap:12px;'>
-                        <div class='card-mini'><div style='font-size:32px; font-weight:700; color:#2563eb;'>10</div><div style='font-size:12px; color:#64748b;'>Heurísticas avaliadas</div></div>
-                        <div class='card-mini'><div style='font-size:32px; font-weight:700; color:#2563eb;'>5</div><div style='font-size:12px; color:#64748b;'>Níveis de classificação</div></div>
-                        <div class='card-mini'><div style='font-size:32px; font-weight:700; color:#2563eb;'>×1.3</div><div style='font-size:12px; color:#64748b;'>Pesos máximos</div></div>
-                        <div class='card-mini'><div style='font-size:32px; font-weight:700; color:#2563eb;'>100</div><div style='font-size:12px; color:#64748b;'>Score máximo</div></div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    st.markdown("\n")
-    if st.button("Iniciar avaliação", key="btn_iniciar_home", use_container_width=True, type="secondary"):
-        st.session_state.view = "url"
-        st.rerun()
-
-    st.markdown("\n")
-    st.subheader("As 10 heurísticas avaliadas")
-
-    for h in HEURISTICS:
-        st.markdown(
-            f"<div class='heuristic-card'>"
-            f"<div style='font-size:13px; font-weight:700; color:#0f172a;'>H{h['id']} · {h['fullName']}</div>"
-            f"<div style='font-size:12px; color:#64748b; margin-top:6px;'>{h['description']}</div>"
-            f"</div>",
-            unsafe_allow_html=True,
-        )
-
-    st.markdown("\n")
-    st.markdown(
-        """
-        <div style='display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px;'>
-            <div class='info-panel'><div style='font-weight:700; margin-bottom:6px; color:#0f172a;'>Lei de Fitts</div><div style='font-size:13px; color:#64748b;'>Influência na acessibilidade e localização de elementos.</div></div>
-            <div class='info-panel'><div style='font-weight:700; margin-bottom:6px; color:#0f172a;'>Lei de Hick</div><div style='font-size:13px; color:#64748b;'>Ajuda a medir a complexidade de escolha nas interfaces.</div></div>
-            <div class='info-panel'><div style='font-weight:700; margin-bottom:6px; color:#0f172a;'>AVALIAÇÃO NEXUS</div><div style='font-size:13px; color:#64748b;'>O resultado final combina peso e avaliação de cada critério.</div></div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-# ─── URL PAGE ─────────────────────────────────────────────────────────────────
-elif st.session_state.view == "url":
-    st.markdown(
-        "<div style='display:flex;align-items:center;gap:10px'><div style='width:32px;height:32px;border-radius:8px;background:#0F172A;color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700'>H10</div><span style='font-size:14px;font-weight:600'>Avaliador Heurístico</span></div>",
-        unsafe_allow_html=True,
-    )
-    st.markdown("---")
-
-    st.title("Qual site será avaliado?")
-    st.write("Informe a URL da interface que você deseja avaliar pelas heurísticas de Nielsen.")
-
-    url_input = st.text_input(
-        "URL do site",
-        value=st.session_state.url,
-        placeholder="exemplo.com.br",
-        key="url_input",
-    )
-
-    if st.button("Avançar para perguntas", type="secondary"):
-        normalized = normalize_url(url_input)
-        if normalized:
-            st.session_state.url = normalized
-            st.session_state.answers = {}
-            st.session_state.current = 0
-            st.session_state.view = "assessment"
-            st.rerun()
-        else:
-            st.warning("Informe uma URL válida para continuar.")
-
-    st.info("Dica: mantenha o site aberto em outra aba para consultar a interface em tempo real.")
-
-# ─── ASSESSMENT PAGE ──────────────────────────────────────────────────────────
-elif st.session_state.view == "assessment":
-    st.markdown(
-        "<div style='display:flex;justify-content:space-between;align-items:center'><div style='display:flex;align-items:center;gap:10px'><div style='width:32px;height:32px;border-radius:8px;background:#0F172A;color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700'>H10</div><span style='font-size:14px;font-weight:600'>Avaliador Heurístico</span></div><span style='color:#64748B'>"
-        f"{len(st.session_state.answers)} / {len(HEURISTICS)} Respondidas"
-        "</span></div>",
-        unsafe_allow_html=True,
-    )
-    st.markdown("---")
-
-    progress = len(st.session_state.answers) / len(HEURISTICS)
-    st.progress(progress)
-
-    # Botões de atalho superiores
-    step_cols = st.columns(len(HEURISTICS))
-    for i, h in enumerate(HEURISTICS):
-        with step_cols[i]:
-            if st.button(f"H{h['id']}", key=f"step_{h['id']}", use_container_width=True):
-                st.session_state.current = i
-                st.rerun()
-            
-            if i == st.session_state.current:
-                st.markdown("<div style='height:6px;background:#0F172A;border-radius:999px'></div>", unsafe_allow_html=True)
-            elif h["id"] in st.session_state.answers:
-                st.markdown("<div style='height:6px;background:#22C55E;border-radius:999px'></div>", unsafe_allow_html=True)
-            else:
-                st.markdown("<div style='height:6px;background:#CBD5E1;border-radius:999px'></div>", unsafe_allow_html=True)
-
-    current_heuristic = HEURISTICS[st.session_state.current]
-
-    st.caption(f"Avaliando item {st.session_state.current + 1} de {len(HEURISTICS)}")
-    st.markdown(f"<h3 style='color:#0f172a; margin-top:0;'>{current_heuristic['fullName']}</h3>", unsafe_allow_html=True)
-    st.write(current_heuristic["description"])
-
-    st.markdown(f"👉 **{current_heuristic['question']}**")
-
-    # Renderização de botões de opção de resposta
-    current_saved_value = st.session_state.answers.get(current_heuristic["id"], None)
-
-    for option in ANSWER_OPTIONS:
-        is_selected = (current_saved_value == option["value"])
-        btn_type = "primary" if is_selected else "tertiary"
-        
-        if st.button(
-            f"{option['label']} — {option['sublabel']}",
-            key=f"opt_{current_heuristic['id']}_{option['value']}",
-            use_container_width=True,
-            type=btn_type
-        ):
-            st.session_state.answers[current_heuristic["id"]] = option["value"]
-            st.rerun()
-
-    st.write("\n")
-    col_prev, col_next = st.columns([1, 1])
-    with col_prev:
-        if st.button("Voltar Anterior", type="tertiary") and st.session_state.current > 0:
-            st.session_state.current -= 1
-            st.rerun()
-            
-    with col_next:
-        if st.session_state.current < len(HEURISTICS) - 1:
-            if st.button("Próxima Pergunta", type="secondary"):
-                if current_heuristic["id"] not in st.session_state.answers:
-                    st.warning("Por favor, selecione uma das opções acima antes de avançar.")
-                else:
-                    st.session_state.current += 1
-                    st.rerun()
-        else:
-            if st.button("Finalizar e Ver Resultados", type="secondary"):
-                if len(st.session_state.answers) < len(HEURISTICS):
-                    st.error("Você precisa responder todas as 10 heurísticas antes de ver o resultado global.")
-                else:
-                    st.session_state.view = "results"
-                    st.rerun()
-
-# ─── RESULTADO PAGINA ─────────────────────────────────────────────────────────────
-elif st.session_state.view == "results":
-    total, by_heuristic = calculate_score(st.session_state.answers)
-    cls = get_classification(total)
-
-    st.title("Resultados da Avaliação Heurística")
-    st.markdown(f"**URL analisada:** `{st.session_state.url}`")
-
-    score_col, text_col = st.columns([1, 2])
-    with score_col:
-        st.markdown(
-            f"<div style='border:1px solid {cls['border']};background:{cls['bg']};padding:24px;border-radius:16px;text-align:center'>"
-            f"<div style='font-size:14px;color:{cls['color']};font-weight:600;margin-bottom:6px'>SCORE FINAL</div>"
-            f"<div style='font-size:54px;font-weight:800;color:{cls['color']}'>{total}%</div>"
-            f"<div style='font-size:13px;color:#64748b;margin-top:4px'>Média ponderada por impacto</div>"
-            f"</div>",
-            unsafe_allow_html=True,
-        )
-    with text_col:
-        st.markdown("### Avaliação")
-        st.markdown(
-            f"<div style='padding:16px;border-left:4px solid {cls['border']};background:{cls['bg']};border-radius:8px'>"
-            f"<strong style='color:{cls['color']};font-size:18px;'>Nível {cls['label']}</strong><br>"
-            f"<p style='margin-top:6px;color:#334155;'>{cls['description']}</p>"
-            f"</div>",
-            unsafe_allow_html=True,
-        )
-
-    st.markdown("---")
-
-    # Mapeamento de pontos fortes e fracos ordenados estritamente por pontuação
-    sorted_heuristics = sorted(HEURISTICS, key=lambda h: by_heuristic[h["id"]], reverse=True)
-    strengths = sorted_heuristics[:3]
+    strengths = sorted(HEURISTICS, key=lambda h: by_heuristic[h["id"]], reverse=True)[:3]
     priorities = sorted(HEURISTICS, key=lambda h: by_heuristic[h["id"]])[:3]
 
-    c1, c2 = st.columns(2)
-    with c1:
-        st.success("🏆 Maiores Pontos Fortes")
-        for h in strengths:
-            st.markdown(f"**{h['shortName']}:** `{by_heuristic[h['id']]}%` de conformidade.")
-
-    with c2:
-        st.warning("⚠️ Áreas Prioritárias de Ajuste")
-        for h in priorities:
-            st.markdown(f"**{h['shortName']}:** `{by_heuristic[h['id']]}%` — Requer atenção imediata.")
-
-    st.markdown("---")
-
-    # Configuração do gráfico radar (Plotly)
-    radar_categories = [h["shortName"] for h in HEURISTICS]
-    radar_scores = [by_heuristic[h["id"]] for h in HEURISTICS]
+    # Título Principal
+    pdf.set_font("Arial", "B", 18)
+    pdf.set_text_color(15, 23, 42)
+    pdf.cell(0, 10, "Relatório de Avaliação Heurística", 0, 1, "L")
     
-    # Fechamento do polígono geométrico do radar
-    radar_categories.append(radar_categories[0])
-    radar_scores.append(radar_scores[0])
+    pdf.set_font("Arial", "", 10)
+    pdf.set_text_color(71, 85, 105)
+    pdf.cell(0, 6, f"Site Avaliado: {url}", 0, 1, "L")
+    pdf.cell(0, 6, f"Data da Avaliação: {datetime.now().strftime('%d/%m/%Y às %H:%M')}", 0, 1, "L")
+    pdf.ln(6)
 
-    radar = go.Figure()
-    radar.add_trace(
-        go.Scatterpolar(
-            r=radar_scores,
-            theta=radar_categories,
-            fill="toself",
-            line_color="#2563EB",
-            fillcolor="rgba(37, 99, 235, 0.15)",
-        )
-    )
-    radar.update_layout(
-        polar={"radialaxis": {"visible": True, "range": [0, 100]}},
-        showlegend=False,
-        title="Mapeamento das 10 Heurísticas (Visão Geral)",
-    )
-    st.plotly_chart(radar, use_container_width=True)
+    # Painel de Score Geral (Destacado)
+    pdf.set_fill_color(248, 250, 252)
+    pdf.rect(10, pdf.get_y(), 190, 24, "F")
+    
+    pdf.set_font("Arial", "B", 11)
+    pdf.set_text_color(71, 85, 105)
+    pdf.set_xy(15, pdf.get_y() + 3)
+    pdf.cell(40, 6, "PONTUAÇÃO GERAL:", 0, 0, "L")
+    
+    pdf.set_font("Arial", "B", 16)
+    pdf.set_text_color(*cls["rgb"])
+    pdf.cell(30, 6, f"{total} / 100", 0, 0, "L")
+    
+    pdf.set_font("Arial", "B", 12)
+    pdf.cell(0, 6, f"Nível: {cls['label']}", 0, 1, "L")
+    
+    pdf.set_font("Arial", "I", 10)
+    pdf.set_text_color(100, 116, 139)
+    pdf.set_x(15)
+    pdf.cell(0, 6, cls["description"], 0, 1, "L")
+    pdf.ln(10)
 
-    st.markdown("---")
-    st.subheader("Análise detalhada por critério")
+    # Destaques: Pontos Fortes e Ajustes
+    pdf.set_font("Arial", "B", 12)
+    pdf.set_text_color(15, 23, 42)
+    pdf.cell(0, 8, "Resumo Estratégico", 0, 1, "L")
+    
+    pdf.set_font("Arial", "B", 10)
+    pdf.set_text_color(5, 150, 105)
+    pdf.cell(95, 6, "Maiores Pontos Fortes:", 0, 0, "L")
+    pdf.set_text_color(217, 119, 6)
+    pdf.cell(95, 6, "Áreas Prioritárias de Ajuste:", 0, 1, "L")
+    
+    pdf.set_font("Arial", "", 9)
+    pdf.set_text_color(51, 65, 85)
+    for i in range(3):
+        h_s = strengths[i]
+        h_p = priorities[i]
+        pdf.cell(95, 5, f"- {h_s['shortName']} ({by_heuristic[h_s['id']]}%)", 0, 0, "L")
+        pdf.cell(95, 5, f"- {h_p['shortName']} ({by_heuristic[h_p['id']]}%)", 0, 1, "L")
+    
+    pdf.ln(8)
+
+    # Tabela Detalhada por Critério
+    pdf.set_font("Arial", "B", 12)
+    pdf.set_text_color(15, 23, 42)
+    pdf.cell(0, 8, "Análise Detalhada por Critério", 0, 1, "L")
+    
+    # Cabeçalho da Tabela
+    pdf.set_fill_color(15, 23, 42)
+    pdf.set_text_color(255, 255, 255)
+    pdf.set_font("Arial", "B", 9)
+    pdf.cell(15, 7, "ID", 1, 0, "C", True)
+    pdf.cell(85, 7, "Heurística", 1, 0, "L", True)
+    pdf.cell(40, 7, "Resposta", 1, 0, "C", True)
+    pdf.cell(20, 7, "Peso", 1, 0, "C", True)
+    pdf.cell(30, 7, "Conformidade", 1, 1, "C", True)
+
+    # Linhas da Tabela
+    pdf.set_font("Arial", "", 9)
+    pdf.set_text_color(51, 65, 85)
     
     for h in HEURISTICS:
         score = by_heuristic[h["id"]]
-        value = st.session_state.answers.get(h["id"], 0)
-        label = get_answer_label(value)
-
-        st.markdown(f"**H{h['id']} · {h['fullName']}**")
-        st.progress(score / 100)
-        st.caption(f"Status avaliado: **{label}** · (Peso Multiplicador: ×{h['weight']}) · Grau de Conformidade: {score}%")
-        st.markdown("<br>", unsafe_allow_html=True)
-
-    # Geração e exportação do relatório TXT
-    report = get_report_text(st.session_state.url, st.session_state.answers, total, by_heuristic)
-    
-    st.download_button(
-        label="📥 Baixar Relatório Técnico (.TXT)",
-        data=report,
-        file_name=f"relatorio_heuristico_h10_{datetime.now().strftime('%Y-%m-%d')}.txt",
-        mime="text/plain",
-        use_container_width=True
-    )
-
-    st.markdown("<br>", unsafe_allow_html=True)
-    if st.button("Iniciar Nova Avaliação Completa", type="tertiary", use_container_width=True):
-        reset_state()
-        st.rerun()
+        val = answers.get(h["id"], 0)
+        lbl = get_answer_label(val)
+        
+        # Zebra striping simples intercalando cores de fundo
+        bg_toggle = pdf.page_no() % 2 == 0
+        pdf.set_fill_color(248, 250, 252) if
