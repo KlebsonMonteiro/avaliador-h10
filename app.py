@@ -193,7 +193,7 @@ def calculate_score(answers):
 
 
 def get_classification(score):
-    if score >= 85:
+    if score >= 90:
         return {
             "label": "Excelente",
             "color": "#059669",
@@ -201,7 +201,7 @@ def get_classification(score):
             "border": "#A7F3D0",
             "description": "Interface exemplar com altíssima usabilidade.",
         }
-    if score >= 70:
+    if score >= 75:
         return {
             "label": "Bom",
             "color": "#2563EB",
@@ -209,7 +209,7 @@ def get_classification(score):
             "border": "#BFDBFE",
             "description": "Boa usabilidade com oportunidades pontuais de melhoria.",
         }
-    if score >= 55:
+    if score >= 60:
         return {
             "label": "Regular",
             "color": "#D97706",
