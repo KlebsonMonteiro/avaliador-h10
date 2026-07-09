@@ -225,6 +225,7 @@ def get_classification(score):
             "border": "#FED7AA",
             "description": "Problemas relevantes afetam a experiência do usuário.",
         }
+    if score <40:
     return {
         "label": "Péssimo",
         "color": "#DC2626",
