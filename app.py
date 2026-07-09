@@ -217,7 +217,7 @@ def get_classification(score):
             "border": "#FDE68A",
             "description": "Usabilidade aceitável, mas com problemas que merecem atenção.",
         }
-    if score >= 40:
+    if score <  60:
         return {
             "label": "Crítico",
             "color": "#EA580C",
