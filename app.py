@@ -217,7 +217,7 @@ def get_classification(score):
             "border": "#FDE68A",
             "description": "Usabilidade aceitável, mas com problemas que merecem atenção.",
         }
-    if score <  60:
+    if score < 60:
         return {
             "label": "Crítico",
             "color": "#EA580C",
@@ -352,8 +352,16 @@ def generate_pdf_report(url, answers, total, by_heuristic):
     elements.append(table)
     elements.append(Spacer(1, 0.5 * cm))
 
-    strengths = sorted(HEURISTICS, key=lambda h: by_heuristic[h["id"]], reverse=True)[:3]
-    priorities = sorted(HEURISTICS, key=lambda h: by_heuristic[h["id"]])[:3]
+    # Pontos fortes: top 3
+    sorted_desc = sorted(HEURISTICS, key=lambda h: by_heuristic[h["id"]], reverse=True)
+    strengths = sorted_desc[:3]
+    # Áreas prioritárias: bottom 3, garantindo que não haja interseção com os pontos fortes
+    sorted_asc = sorted(HEURISTICS, key=lambda h: by_heuristic[h["id"]])
+    strength_ids = {h["id"] for h in strengths}
+    priorities = [h for h in sorted_asc if h["id"] not in strength_ids][:3]
+    # Se o score geral for 100%, não há áreas prioritárias
+    if total == 100:
+        priorities = []
 
     elements.append(Paragraph("Pontos Fortes", sub_heading_style))
     for h in strengths:
@@ -362,10 +370,13 @@ def generate_pdf_report(url, answers, total, by_heuristic):
         )
 
     elements.append(Paragraph("Áreas Prioritárias", sub_heading_style))
-    for h in priorities:
-        elements.append(
-            Paragraph(f"! {h['fullName']} — {by_heuristic[h['id']]}%", body_style)
-        )
+    if not priorities:
+        elements.append(Paragraph("Nenhuma área prioritária identificada.", body_style))
+    else:
+        for h in priorities:
+            elements.append(
+                Paragraph(f"! {h['fullName']} — {by_heuristic[h['id']]}%", body_style)
+            )
 
     elements.append(Spacer(1, 1 * cm))
     elements.append(HRFlowable(width="100%", color=colors.HexColor("#cbd5e1"), thickness=1))
@@ -636,9 +647,14 @@ elif st.session_state.view == "results":
     st.markdown("---")
 
     # Mapeamento de pontos fortes e fracos ordenados estritamente por pontuação
-    sorted_heuristics = sorted(HEURISTICS, key=lambda h: by_heuristic[h["id"]], reverse=True)
-    strengths = sorted_heuristics[:3]
-    priorities = sorted(HEURISTICS, key=lambda h: by_heuristic[h["id"]])[:3]
+    sorted_desc = sorted(HEURISTICS, key=lambda h: by_heuristic[h["id"]], reverse=True)
+    sorted_asc = sorted(HEURISTICS, key=lambda h: by_heuristic[h["id"]])
+    strengths = sorted_desc[:3]
+    strength_ids = {h["id"] for h in strengths}
+    priorities = [h for h in sorted_asc if h["id"] not in strength_ids][:3]
+    # Se o score geral for 100%, não há áreas prioritárias
+    if total == 100:
+        priorities = []
 
     c1, c2 = st.columns(2)
     with c1:
@@ -647,9 +663,12 @@ elif st.session_state.view == "results":
             st.markdown(f"**{h['shortName']}:** `{by_heuristic[h['id']]}%` de conformidade.")
 
     with c2:
-        st.warning("⚠️ Áreas Prioritárias de Ajuste")
-        for h in priorities:
-            st.markdown(f"**{h['shortName']}:** `{by_heuristic[h['id']]}%` — Requer atenção imediata.")
+        if not priorities:
+            st.info("✅ Nenhuma área prioritária identificada — score perfeito ou sem divergências.")
+        else:
+            st.warning("⚠️ Áreas Prioritárias de Ajuste")
+            for h in priorities:
+                st.markdown(f"**{h['shortName']}:** `{by_heuristic[h['id']]}%` — Requer atenção imediata.")
 
     st.markdown("---")
 
