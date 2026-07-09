@@ -219,14 +219,14 @@ def get_classification(score):
         }
     if score >= 40:
         return {
-            "label": "Deficiente",
+            "label": "Crítico",
             "color": "#EA580C",
             "bg": "#FFF7ED",
             "border": "#FED7AA",
             "description": "Problemas relevantes afetam a experiência do usuário.",
         }
     return {
-        "label": "Crítico",
+        "label": "Péssimo",
         "color": "#DC2626",
         "bg": "#FEF2F2",
         "border": "#FECACA",
