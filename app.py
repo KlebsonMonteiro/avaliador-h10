@@ -225,14 +225,13 @@ def get_classification(score):
             "border": "#FED7AA",
             "description": "Problemas relevantes afetam a experiência do usuário.",
         }
-        return {
+    return {
         "label": "Péssimo",
         "color": "#DC2626",
         "bg": "#FEF2F2",
         "border": "#FECACA",
         "description": "Problemas graves de usabilidade comprometendo o sistema.",
     }
-   
 
 
 def normalize_url(raw_url):
